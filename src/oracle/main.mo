@@ -5,6 +5,8 @@ import ExperimentalCycles "mo:base/ExperimentalCycles";
 import { decodePrice } "helpers";
 import Text "mo:base/Text";
 import Debug "mo:base/Debug";
+import Nat "mo:base/Nat";
+import Random "mo:base/Random";
 
 actor {
 
@@ -46,4 +48,22 @@ actor {
       response with headers = []; // not intersted in the headers
     };
   };
+
+  public func updateIRSC( rate : Nat ) : async Nat {
+
+    let random = Random.Finite(await Random.blob());
+    
+    switch (random.byte()) {
+      case null { rate };
+      case (?num) {
+        if( num % 3 == 0) {
+          return (rate);
+        } else if ( num % 3 == 1 ) {
+          return (rate + 5);
+        } else {
+          return (rate - 5);
+        }
+      };
+    };
+  }
 };
