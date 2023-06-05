@@ -1,7 +1,7 @@
 {
   "canisters": {
-    "irsc_backend": {
-      "main": "src/irsc_backend/main.mo",
+    "vaults": {
+      "main": "src/vaults/main.mo",
       "type": "motoko"
     },
     "oracle": {
