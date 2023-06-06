@@ -2,6 +2,7 @@ import Types "types";
 import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
+import Hash "mo:base/Hash";
 
 actor {
 
@@ -10,7 +11,7 @@ actor {
   var stabilityFee = 1;
   var liquidationFee = 5;
 
-  var open_cdps = HashMap.HashMap<Principal, Types.CDP>(1, Principal.equal, Principal.hash);
+  var open_cdps = HashMap.HashMap<Principal, Types.CDP>(5, Principal.equal, Principal.hash);
 
 
   public query func ckBTCRate() : async Nat {
@@ -34,12 +35,16 @@ actor {
           state = #active
         };
 
+        open_cdps.put(caller, new_pos);
         return #ok(new_pos);
        };
       case (?pos) {
         return #err("You already have an open position!");
       }
     }
-  } 
+  };
 
+  public shared ({ caller }) func get_current_cdp() : async ?Types.CDP {
+    open_cdps.get(caller);
+  }
 };
