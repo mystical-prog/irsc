@@ -4,7 +4,7 @@ module {
     owner : Principal;
     subaccount : ?Subaccount;
   };
-  public type Cdp = {
+  public type CDP = {
     debtor : Principal;
     debt_rate : Nat;
     entry_rate : Nat;
