@@ -4,10 +4,12 @@ import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
 import Hash "mo:base/Hash";
 import oracle "canister:oracle";
+import { calculate_figures } "helpers";
 
 actor {
 
-  var ckbtcRate = 26_00_000;
+  stable var ckbtcRate : Nat = 0;
+  let liquidationRate : Nat = 135;
   var irscRate = 8225;
   var stabilityFee = 1;
   var liquidationFee = 5;
@@ -15,7 +17,7 @@ actor {
   var open_cdps = HashMap.HashMap<Principal, Types.CDP>(5, Principal.equal, Principal.hash);
 
 
-  public query func ckBTCRate() : async Nat {
+  public query func getckBTCRate() : async Nat {
     ckbtcRate;
   };
 
@@ -31,15 +33,19 @@ actor {
         switch(result_val) {
           case null { return #err("Something is wrong with the Oracle") };
           case (?num) {
-            
+
+            ckbtcRate := num;
+
+            let calc = calculate_figures(liquidationRate + _debtrate, num, _amount);
+
             let new_pos : Types.CDP = {
               debtor = caller;
               amount = _amount;
-              debt_rate = _debtrate;
+              debt_rate = liquidationRate + _debtrate;
               entry_rate = num;
-              liquidation_rate = 25000;
-              max_debt = 10;
-              debt_issued = 2;
+              liquidation_rate = calc.liquidation_rate;
+              max_debt = calc.max_debt;
+              debt_issued = 0;
               state = #active
             };
 

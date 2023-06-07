@@ -14,4 +14,8 @@ module {
     debt_issued : Nat;
     state : { #active; #closed; #liquidated };
   };
+  public type Helper_Return1 = {
+    max_debt : Nat;
+    liquidation_rate : Nat;
+  }
 }
