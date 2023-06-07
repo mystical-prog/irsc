@@ -3,10 +3,13 @@ import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
 import Hash "mo:base/Hash";
-import oracle "canister:oracle";
-import { calculate_figures } "helpers";
+import CkBtcLedger "canister:ckbtc_ledger";
+import { init_position_figures ; toAccount; toSubaccount } "helpers";
+import Error "mo:base/Error";
 
-actor {
+actor Vaults {
+
+  var oracle = actor("be2us-64aaa-aaaaa-qaabq-cai") : Types.oracle;
 
   stable var ckbtcRate : Nat = 0;
   let liquidationRate : Nat = 135;
@@ -27,7 +30,16 @@ actor {
     switch (open_cdps.get(caller)) {
       case null { 
 
+        let balance = await CkBtcLedger.icrc1_balance_of(
+          toAccount({ caller; canister = Principal.fromActor(Vaults) })
+        );
+
+        if (balance < _amount) {
+          return #err("Not enough funds available in the Account. Make sure you send required ckBTC");
+        };
+
         var btc_rate = await oracle.getBTC();
+        
         Result.assertOk(btc_rate);
         let result_val = Result.toOption(btc_rate);
         switch(result_val) {
@@ -36,7 +48,33 @@ actor {
 
             ckbtcRate := num;
 
-            let calc = calculate_figures(liquidationRate + _debtrate, num, _amount);
+            try {
+              // if enough funds were sent, move them to the canisters default account
+              let transferResult = await CkBtcLedger.icrc1_transfer(
+                {
+                  amount = _amount;
+                  from_subaccount = ?toSubaccount(caller);
+                  created_at_time = null;
+                  fee = null;
+                  memo = null;
+                  to = {
+                    owner = Principal.fromActor(Vaults);
+                    subaccount = null;
+                  };
+                }
+              );
+
+              switch (transferResult) {
+                case (#Err(transferError)) {
+                  return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+                };
+                case (_) {};
+              };
+            } catch (error : Error) {
+              return #err("Reject message: " # Error.message(error));
+            };
+
+            let calc = init_position_figures(liquidationRate + _debtrate, num, _amount);
 
             let new_pos : Types.CDP = {
               debtor = caller;
@@ -62,5 +100,10 @@ actor {
 
   public shared ({ caller }) func get_current_cdp() : async ?Types.CDP {
     open_cdps.get(caller);
-  }
+  };
+
+  public shared ({ caller }) func get_subAccount() : async Types.Account {
+    toAccount({ caller; canister = Principal.fromActor(Vaults) });
+  };
+
 };

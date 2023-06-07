@@ -1,9 +1,15 @@
+import Result "mo:base/Result";
 module {
+  
+  public type oracle = actor { getBTC : () -> async Result.Result<Nat, Text>; updateIRSC : ( rate : Nat ) -> async Nat};
+
   public type Subaccount = Blob;
+
   public type Account = {
     owner : Principal;
     subaccount : ?Subaccount;
   };
+
   public type CDP = {
     debtor : Principal;
     debt_rate : Nat;
