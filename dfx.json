@@ -2,7 +2,8 @@
   "canisters": {
     "vaults": {
       "main": "src/vaults/main.mo",
-      "type": "motoko"
+      "type": "motoko",
+      "dependencies": ["oracle"]
     },
     "oracle": {
       "main": "src/oracle/main.mo",

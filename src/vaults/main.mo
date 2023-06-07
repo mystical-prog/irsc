@@ -3,6 +3,7 @@ import Principal "mo:base/Principal";
 import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
 import Hash "mo:base/Hash";
+import oracle "canister:oracle";
 
 actor {
 
@@ -24,19 +25,28 @@ actor {
     switch (open_cdps.get(caller)) {
       case null { 
 
-        let new_pos : Types.CDP = {
-          debtor = caller;
-          amount = _amount;
-          debt_rate = _debtrate;
-          entry_rate = 26000;
-          liquidation_rate = 25000;
-          max_debt = 10;
-          debt_issued = 2;
-          state = #active
-        };
+        var btc_rate = await oracle.getBTC();
+        Result.assertOk(btc_rate);
+        let result_val = Result.toOption(btc_rate);
+        switch(result_val) {
+          case null { return #err("Something is wrong with the Oracle") };
+          case (?num) {
+            
+            let new_pos : Types.CDP = {
+              debtor = caller;
+              amount = _amount;
+              debt_rate = _debtrate;
+              entry_rate = num;
+              liquidation_rate = 25000;
+              max_debt = 10;
+              debt_issued = 2;
+              state = #active
+            };
 
-        open_cdps.put(caller, new_pos);
-        return #ok(new_pos);
+            open_cdps.put(caller, new_pos);
+            return #ok(new_pos);
+          }
+        }
        };
       case (?pos) {
         return #err("You already have an open position!");
