@@ -3,11 +3,25 @@
     "vaults": {
       "main": "src/vaults/main.mo",
       "type": "motoko",
-      "dependencies": ["oracle"]
+      "dependencies": [
+        "oracle", 
+        "ckbtc_ledger"
+      ]
     },
     "oracle": {
       "main": "src/oracle/main.mo",
       "type": "motoko"
+    },
+    "ckbtc_ledger" : {
+      "type" : "custom",
+      "candid" : "icrc1.public.did",
+      "wasm" : "icrc1.wasm",
+      "remote": {
+        "candid": "icrc1.public.did",
+        "id": {
+          "ic" : "mxzaz-hqaaa-aaaar-qaada-cai"
+        }
+      }
     }
   },
   "defaults": {
