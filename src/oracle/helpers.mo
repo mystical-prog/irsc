@@ -21,7 +21,17 @@ module {
         switch (Nat.fromText(temp)) {
           case null { 0 };
           case (?num) {
-            num / 10;
+            if(Text.size(temp) == 17) {
+              return num / 100;
+            } else if(Text.size(temp) == 16) {
+              return num / 10;
+            } else if(Text.size(temp) == 15) {
+              return num;
+            } else if(Text.size(temp) == 18) {
+              return num / 1000;
+            } else {
+              return 0;
+            }
           } 
         };
         };

@@ -140,4 +140,133 @@ actor Vaults {
     "Transferred " # debug_show(balance) # " back to your account";
   };
 
+  public shared ({ caller }) func add_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    switch (open_cdps.get(caller)) {
+      case null { #err("You need to have an active cdp first!") };
+      case (?open_pos) {
+
+        let balance = await CkBtcLedger.icrc1_balance_of(
+          toAccount({ caller; canister = Principal.fromActor(Vaults) })
+        );
+
+        if (balance < _amount) {
+          return #err("Not enough funds available in the Account. Make sure you send required ckBTC");
+        };
+
+        var btc_rate = await oracle.getBTC();        
+        Result.assertOk(btc_rate);
+        let result_val = Result.toOption(btc_rate);
+
+        switch(result_val) {
+          case null { #err("Something is wrong with the Oracle") };
+          case (?num) {
+            ckbtcRate := num;
+
+            try {
+              // if enough funds were sent, move them to the canisters default account
+              let transferResult = await CkBtcLedger.icrc1_transfer(
+                {
+                  amount = _amount;
+                  from_subaccount = ?toSubaccount(caller);
+                  created_at_time = null;
+                  fee = null;
+                  memo = null;
+                  to = {
+                    owner = Principal.fromActor(Vaults);
+                    subaccount = null;
+                  };
+                }
+              );
+
+            switch (transferResult) {
+                case (#Err(transferError)) {
+                  return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+                };
+                case (_) {};
+              };
+            } catch (error : Error) {
+              return #err("Reject message: " # Error.message(error));
+            };
+
+            let new_amount = open_pos.amount + _amount;
+            let avg = ((open_pos.amount * open_pos.entry_rate) + ( num * _amount )) / new_amount;
+            let calc = init_position_figures(open_pos.debt_rate, avg, new_amount);
+            
+            let updated_pos : Types.CDP = {
+              debtor = open_pos.debtor;
+              amount = new_amount;
+              debt_rate = open_pos.debt_rate;
+              entry_rate = avg;
+              liquidation_rate = calc.liquidation_rate;
+              max_debt = calc.max_debt;
+              debt_issued = open_pos.debt_issued;
+              state = #active
+            };
+
+            ignore open_cdps.replace(caller, updated_pos);
+            #ok(updated_pos);
+          }
+        }
+      }
+    };
+  };
+
+  public shared ({ caller }) func remove_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    switch (open_cdps.get(caller)) {
+      case null { #err("You need to have an active cdp first!") };
+      case (?open_pos) {
+        
+        if(open_pos.amount < _amount) {
+          return #err("amount being removed is greater than the position!");
+        };
+        
+        let new_amount : Nat = open_pos.amount - _amount;
+        let calc = init_position_figures(open_pos.debt_rate, open_pos.entry_rate, new_amount);
+        
+        if(calc.max_debt <= open_pos.debt_issued) {
+          return #err("Repay some of the debt first!");
+        };
+
+        let updated_pos : Types.CDP = {
+          debtor = open_pos.debtor;
+          amount = new_amount;
+          debt_rate = open_pos.debt_rate;
+          entry_rate = open_pos.entry_rate;
+          liquidation_rate = calc.liquidation_rate;
+          max_debt = calc.max_debt;
+          debt_issued = open_pos.debt_issued;
+          state = #active
+        };
+
+        ignore open_cdps.replace(caller, updated_pos);
+        
+        try {
+
+          let transferResult = await CkBtcLedger.icrc1_transfer(
+            {
+              amount = _amount;
+              from_subaccount = null;
+              created_at_time = null;
+              fee = null;
+              memo = null;
+              to = {
+                owner = caller;
+                subaccount = null;
+              };
+            }
+          );
+
+        switch (transferResult) {
+            case (#Err(transferError)) {
+              return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+            };
+            case (_) {};
+          };
+        } catch (error : Error) {
+          return #err("Reject message: " # Error.message(error));
+        };
+        #ok(updated_pos);
+      }
+    };
+  };
 };
