@@ -21,7 +21,7 @@ module {
         switch (Nat.fromText(temp)) {
           case null { 0 };
           case (?num) {
-            num / 100;
+            num / 10;
           } 
         };
         };

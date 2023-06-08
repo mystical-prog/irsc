@@ -106,4 +106,38 @@ actor Vaults {
     toAccount({ caller; canister = Principal.fromActor(Vaults) });
   };
 
+  public shared ({ caller }) func withdraw_from_subAccount() : async Text {
+    let balance = await CkBtcLedger.icrc1_balance_of(
+      toAccount({ caller; canister = Principal.fromActor(Vaults) })
+    );
+
+    try {
+
+      let transferResult = await CkBtcLedger.icrc1_transfer(
+        {
+          amount = balance;
+          from_subaccount = ?toSubaccount(caller);
+          created_at_time = null;
+          fee = null;
+          memo = null;
+          to = {
+            owner = caller;
+            subaccount = null;
+          };
+        }
+      );
+
+      switch (transferResult) {
+        case (#Err(transferError)) {
+          return ("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+        };
+        case (_) {};
+      };
+    } catch (error : Error) {
+      return ("Reject message: " # Error.message(error));
+    };
+
+    "Transferred " # debug_show(balance) # " back to your account";
+  };
+
 };
