@@ -5,7 +5,8 @@
       "type": "motoko",
       "dependencies": [
         "oracle", 
-        "ckbtc_ledger"
+        "ckbtc_ledger",
+        "irsc_ledger"
       ]
     },
     "oracle": {
@@ -22,6 +23,11 @@
           "ic" : "mxzaz-hqaaa-aaaar-qaada-cai"
         }
       }
+    },
+    "irsc_ledger" : {
+      "type" : "custom",
+      "candid" : "icrc1.public.did",
+      "wasm" : "icrc1.wasm"
     }
   },
   "defaults": {

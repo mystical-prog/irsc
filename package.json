@@ -5,11 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "npm run replica && npm run private-dids && npm run deploy",
-    "replica": "dfx stop && rm -rf .dfx && dfx start --clean --background && dfx canister create ckbtc_ledger && dfx canister create vaults && dfx canister create oracle",
-    "deploy": "npm run deploy:ledger && npm run deploy:irsc",
-    "public-dids": "perl -i -pe 's|icrc1\\.did|icrc1\\.public\\.did|g' dfx.json",
+    "replica": "dfx stop && rm -rf .dfx && dfx start --clean --background && dfx canister create ckbtc_ledger && dfx canister create vaults && dfx canister create oracle && dfx canister create irsc_ledger",
+    "deploy": "npm run deploy:ledger && npm run deploy:irsc_ledger && npm run deploy:irsc",
+    "public-dids": "perl -i -pe 's|icrc1\\.did|icrc1\\.public\\.did||g' dfx.json",
     "private-dids": "perl -i -pe 's|icrc1\\.public\\.did|icrc1\\.did|g' dfx.json",
     "deploy:ledger": "PRINCIPAL=$(dfx identity get-principal) && dfx deploy ckbtc_ledger --argument \"(variant {Init = record {minting_account = record { owner = principal \\\"$PRINCIPAL\\\" };transfer_fee = 0;token_symbol = \\\"ckBTC\\\";token_name = \\\"Token ckBTC\\\";metadata = vec {};initial_balances = vec {record { record {owner = principal \\\"$PRINCIPAL\\\"}; 100_000_000_000 } };archive_options = record {num_blocks_to_archive = 10_000;trigger_threshold = 20_000;cycles_for_archive_creation = opt 4_000_000_000_000;controller_id = principal \\\"$PRINCIPAL\\\";};}})\"  --mode=reinstall -y",
+    "deploy:irsc_ledger": "dfx deploy irsc_ledger --argument \"(variant {Init = record {minting_account = record { owner = principal \\\"bd3sg-teaaa-aaaaa-qaaba-cai\\\" };transfer_fee = 0;token_symbol = \\\"IRSC\\\";token_name = \\\"Token IRSC\\\";metadata = vec {};initial_balances = vec {};archive_options = record {num_blocks_to_archive = 1_000;trigger_threshold = 2_000;controller_id = principal \\\"bd3sg-teaaa-aaaaa-qaaba-cai\\\";};}})\" --mode=reinstall -y",
     "deploy:irsc": "npm run public-dids && dfx deploy vaults && dfx deploy oracle",
     "mint": "read -p \"Enter a principal you want to mint tokens to. By default 1000 ckBTC will be minted to your current dfx identity.\n\" recipient && if [ -z \"$recipient\" ]; then echo \"No recipient specified, skipping minting.\"; else dfx canister call ckbtc_ledger icrc1_transfer \"(record {to = record {owner = principal \\\"$recipient\\\"};amount=100_000_000_000},)\"; fi"
   },

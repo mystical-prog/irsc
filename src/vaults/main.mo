@@ -4,6 +4,7 @@ import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
 import Hash "mo:base/Hash";
 import CkBtcLedger "canister:ckbtc_ledger";
+import IrscLedger "canister:irsc_ledger";
 import { init_position_figures ; toAccount; toSubaccount } "helpers";
 import Error "mo:base/Error";
 
@@ -269,4 +270,34 @@ actor Vaults {
       }
     };
   };
+
+  public shared ({ caller }) func issue_debt( _amount : Nat ) : async Result.Result<Text, Text> {
+        try {
+
+          let transferResult = await IrscLedger.icrc1_transfer(
+            {
+              amount = _amount;
+              from_subaccount = null;
+              created_at_time = null;
+              fee = null;
+              memo = null;
+              to = {
+                owner = caller;
+                subaccount = null;
+              };
+            }
+          );
+
+        switch (transferResult) {
+            case (#Err(transferError)) {
+              return #err("Couldn't mint IRSC :\n" # debug_show (transferError));
+            };
+            case (_) {};
+          };
+        } catch (error : Error) {
+          return #err("Reject message: " # Error.message(error));
+        };
+
+      #ok("Successfully minted " # debug_show(_amount));
+  }
 };
