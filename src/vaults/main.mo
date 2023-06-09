@@ -7,6 +7,8 @@ import CkBtcLedger "canister:ckbtc_ledger";
 import IrscLedger "canister:irsc_ledger";
 import { init_position_figures ; toAccount; toSubaccount } "helpers";
 import Error "mo:base/Error";
+import Nat "mo:base/Nat";
+import Text "mo:base/Text";
 
 actor Vaults {
 
@@ -18,7 +20,10 @@ actor Vaults {
   var stabilityFee = 1;
   var liquidationFee = 5;
 
+  stable var closed_cdps_count = 0;
+
   var open_cdps = HashMap.HashMap<Principal, Types.CDP>(5, Principal.equal, Principal.hash);
+  var closed_cdps = HashMap.HashMap<Text, Types.CDP>(1, Text.equal, Text.hash);
 
 
   public query func getckBTCRate() : async Nat {
@@ -103,7 +108,7 @@ actor Vaults {
     open_cdps.get(caller);
   };
 
-  public shared ({ caller }) func get_subAccount_ckBTC() : async Types.Account {
+  public shared ({ caller }) func get_subAccount() : async Types.Account {
     toAccount({ caller; canister = Principal.fromActor(Vaults) });
   };
 
@@ -421,4 +426,80 @@ actor Vaults {
       }
     };
   };
+
+  public shared ({ caller }) func close_position() : async Result.Result<Types.CDP, Text> {
+    switch (open_cdps.get(caller)) {
+      case null { #err("You need to have an open position first!") };
+      case (?open_pos) { 
+
+        let balance = await IrscLedger.icrc1_balance_of(
+          toAccount({ caller; canister = Principal.fromActor(Vaults) })
+        );
+
+        if (balance < open_pos.debt_issued) {
+          return #err("Not enough funds available in the Account. Make sure you send required IRSC");
+        };
+
+        if(open_pos.debt_issued > 0){
+          try {
+            // if enough funds were sent, move them to the canisters default account
+            let transferResult = await IrscLedger.icrc1_transfer(
+              {
+                amount = open_pos.debt_issued;
+                from_subaccount = ?toSubaccount(caller);
+                created_at_time = null;
+                fee = null;
+                memo = null;
+                to = {
+                  owner = Principal.fromActor(Vaults);
+                  subaccount = null;
+                };
+              }
+            );
+
+          switch (transferResult) {
+              case (#Err(transferError)) {
+                return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+              };
+              case (_) {};
+            };
+          } catch (error : Error) {
+            return #err("Reject message: " # Error.message(error));
+          };
+        };
+
+        var btc_rate = await oracle.getBTC();
+        
+        Result.assertOk(btc_rate);
+        let result_val = Result.toOption(btc_rate);
+        switch(result_val) {
+          case null { return #err("Something is wrong with the Oracle") };
+          case (?num) {
+            assert num > 0;
+
+            if(num < open_pos.liquidation_rate) {
+              return #err("Your position is liquidated, cannot close it!");
+            };
+
+            let updated_pos : Types.CDP = {
+              debtor = caller;
+              debt_rate = open_pos.debt_rate;
+              entry_rate = open_pos.entry_rate;
+              liquidation_rate = open_pos.liquidation_rate;
+              amount = open_pos.amount;
+              max_debt = open_pos.max_debt;
+              debt_issued = open_pos.debt_issued;
+              state = #closed;
+            };
+
+            ignore open_cdps.remove(caller);
+            closed_cdps.put(Nat.toText(closed_cdps_count), updated_pos);
+            closed_cdps_count := closed_cdps_count + 1;
+            #ok(updated_pos);
+          } 
+        }
+      }
+    };
+  };
+
 };
