@@ -16,9 +16,9 @@ actor Vaults {
 
   stable var ckbtcRate : Nat = 0;
   let liquidationRate : Nat = 135;
-  var irscRate = 8225;
-  var stabilityFee = 1;
-  var liquidationFee = 5;
+  var irscRate = 82_25_000_000;
+  var stabilityRate = 1;
+  var liquidationFeeRate = 5;
 
   stable var closed_cdps_count = 0;
 
@@ -32,6 +32,8 @@ actor Vaults {
 
   public shared ({ caller }) func create_cdp( _debtrate : Nat, _amount : Nat ) : async Result.Result<Types.CDP, Text> {
     
+    assert _amount > 0;
+
     // Check for an already open position.
     switch (open_cdps.get(caller)) {
       case null { 
@@ -85,6 +87,7 @@ actor Vaults {
             let new_pos : Types.CDP = {
               debtor = caller;
               amount = _amount;
+              volume = _amount;
               debt_rate = liquidationRate + _debtrate;
               entry_rate = num;
               liquidation_rate = calc.liquidation_rate;
@@ -181,6 +184,9 @@ actor Vaults {
   };
 
   public shared ({ caller }) func add_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    
+    assert _amount > 0;
+
     switch (open_cdps.get(caller)) {
       case null { #err("You need to have an active cdp first!") };
       case (?open_pos) {
@@ -231,10 +237,12 @@ actor Vaults {
             let new_amount = open_pos.amount + _amount;
             let avg = ((open_pos.amount * open_pos.entry_rate) + ( num * _amount )) / new_amount;
             let calc = await init_position_figures(open_pos.debt_rate, avg, new_amount, open_pos.debt_issued);
-            
+            let new_volume = open_pos.volume + _amount;
+
             let updated_pos : Types.CDP = {
               debtor = open_pos.debtor;
               amount = new_amount;
+              volume = new_volume;
               debt_rate = open_pos.debt_rate;
               entry_rate = avg;
               liquidation_rate = calc.liquidation_rate;
@@ -252,6 +260,9 @@ actor Vaults {
   };
 
   public shared ({ caller }) func remove_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    
+    assert _amount > 0;
+
     switch (open_cdps.get(caller)) {
       case null { #err("You need to have an active cdp first!") };
       case (?open_pos) {
@@ -270,6 +281,7 @@ actor Vaults {
         let updated_pos : Types.CDP = {
           debtor = open_pos.debtor;
           amount = new_amount;
+          volume = open_pos.volume;
           debt_rate = open_pos.debt_rate;
           entry_rate = open_pos.entry_rate;
           liquidation_rate = calc.liquidation_rate;
@@ -311,6 +323,9 @@ actor Vaults {
   };
 
   public shared ({ caller }) func issue_debt( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    
+    assert _amount > 0;
+    
     switch (open_cdps.get(caller)) {
       case null { #err("You need to have an active cdp first!") };
       case (?open_pos) {
@@ -328,6 +343,7 @@ actor Vaults {
           entry_rate = open_pos.entry_rate;
           liquidation_rate = calc.liquidation_rate;
           amount = open_pos.amount;
+          volume = open_pos.volume;
           max_debt = open_pos.max_debt;
           debt_issued = new_debt_issued;
           state = #active;
@@ -364,6 +380,9 @@ actor Vaults {
   };
 
   public shared ({ caller }) func repay_debt( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    
+    assert _amount > 0;
+    
     switch (open_cdps.get(caller)) {
       case null { #err("You need to have an open position first!") };
       case (?open_pos) { 
@@ -416,6 +435,7 @@ actor Vaults {
           entry_rate = open_pos.entry_rate;
           liquidation_rate = calc.liquidation_rate;
           amount = open_pos.amount;
+          volume = open_pos.volume;
           max_debt = open_pos.max_debt;
           debt_issued = new_debt_issued;
           state = #active;
@@ -459,12 +479,43 @@ actor Vaults {
 
           switch (transferResult) {
               case (#Err(transferError)) {
-                return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+                return #err("Couldn't transfer IRSC to default account:\n" # debug_show (transferError));
               };
               case (_) {};
             };
           } catch (error : Error) {
             return #err("Reject message: " # Error.message(error));
+          };
+        };
+
+        let stabilityFee = (open_pos.volume * stabilityRate) / 100;
+
+        assert stabilityFee > 0;
+
+        if(open_pos.amount > 0) {
+          try {
+            let transferResult = await CkBtcLedger.icrc1_transfer(
+              {
+                amount = open_pos.amount - stabilityFee;
+                from_subaccount = null;
+                created_at_time = null;
+                fee = null;
+                memo = null;
+                to = {
+                  owner = caller;
+                  subaccount = null;
+                };
+              }
+            );
+
+            switch (transferResult) {
+              case (#Err(transferError)) {
+                return #err("Couldn't transfer ckBTC to required account:\n" # debug_show (transferError));
+              };
+              case (_) {};
+              };
+            } catch (error : Error) {
+              return #err("Reject message: " # Error.message(error));
           };
         };
 
@@ -487,6 +538,7 @@ actor Vaults {
               entry_rate = open_pos.entry_rate;
               liquidation_rate = open_pos.liquidation_rate;
               amount = open_pos.amount;
+              volume = open_pos.volume;
               max_debt = open_pos.max_debt;
               debt_issued = open_pos.debt_issued;
               state = #closed;

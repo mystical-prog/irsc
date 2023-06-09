@@ -16,6 +16,7 @@ module {
     entry_rate : Nat;
     liquidation_rate : Nat;
     amount : Nat;
+    volume : Nat;
     max_debt : Nat;
     debt_issued : Nat;
     state : { #active; #closed; #liquidated };
