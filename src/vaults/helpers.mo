@@ -11,11 +11,8 @@ module {
     public func init_position_figures( debt_rate : Nat, entry_rate : Nat, amount : Nat, used_debt : Nat ) : async Types.Helper_Return1 {
 
         let half_value : Nat = (amount * entry_rate) / 200_000_000;
-        Debug.print(debug_show(half_value));
 
         let sur : Nat = (half_value * (debt_rate - 100)) / 100;
-
-        Debug.print(debug_show(sur));
 
         let col_value : Nat = half_value + sur;
         let max_debt : Nat = half_value - sur;
@@ -24,11 +21,7 @@ module {
 
         let liq_value : Nat = half_value + (( half_value * 35 ) / 100 );
 
-        Debug.print(debug_show(liq_value));
-
         let liquidation_rate : Nat = (liq_value * entry_rate) / (col_value + free_debt);
-
-        Debug.print(debug_show(liquidation_rate));
 
         let return_val : Types.Helper_Return1 = {
             max_debt = max_debt;

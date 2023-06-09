@@ -103,11 +103,11 @@ actor Vaults {
     open_cdps.get(caller);
   };
 
-  public shared ({ caller }) func get_subAccount() : async Types.Account {
+  public shared ({ caller }) func get_subAccount_ckBTC() : async Types.Account {
     toAccount({ caller; canister = Principal.fromActor(Vaults) });
   };
 
-  public shared ({ caller }) func withdraw_from_subAccount() : async Text {
+  public shared ({ caller }) func withdraw_from_subAccount_ckBTC() : async Text {
     let balance = await CkBtcLedger.icrc1_balance_of(
       toAccount({ caller; canister = Principal.fromActor(Vaults) })
     );
@@ -138,7 +138,41 @@ actor Vaults {
       return ("Reject message: " # Error.message(error));
     };
 
-    "Transferred " # debug_show(balance) # " back to your account";
+    "Transferred " # debug_show(balance) # " ckBTC back to your account";
+  };
+
+  public shared ({ caller }) func withdraw_from_subAccount_irsc() : async Text {
+    let balance = await IrscLedger.icrc1_balance_of(
+      toAccount({ caller; canister = Principal.fromActor(Vaults) })
+    );
+
+    try {
+
+      let transferResult = await IrscLedger.icrc1_transfer(
+        {
+          amount = balance;
+          from_subaccount = ?toSubaccount(caller);
+          created_at_time = null;
+          fee = null;
+          memo = null;
+          to = {
+            owner = caller;
+            subaccount = null;
+          };
+        }
+      );
+
+      switch (transferResult) {
+        case (#Err(transferError)) {
+          return ("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+        };
+        case (_) {};
+      };
+    } catch (error : Error) {
+      return ("Reject message: " # Error.message(error));
+    };
+
+    "Transferred " # debug_show(balance) # " IRSC back to your account";
   };
 
   public shared ({ caller }) func add_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
@@ -271,9 +305,30 @@ actor Vaults {
     };
   };
 
-  public shared ({ caller }) func issue_debt( _amount : Nat ) : async Result.Result<Text, Text> {
-        try {
+  public shared ({ caller }) func issue_debt( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    switch (open_cdps.get(caller)) {
+      case null { #err("You need to have an active cdp first!") };
+      case (?open_pos) {
 
+        if(open_pos.debt_issued + _amount > open_pos.max_debt) {
+          return #err("You cannot issue more than max debt alloted on the position!");
+        };
+
+        let new_debt_issued = open_pos.debt_issued + _amount;
+        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
+
+        let updated_pos : Types.CDP = {
+          debtor = caller;
+          debt_rate = open_pos.debt_rate;
+          entry_rate = open_pos.entry_rate;
+          liquidation_rate = calc.liquidation_rate;
+          amount = open_pos.amount;
+          max_debt = open_pos.max_debt;
+          debt_issued = new_debt_issued;
+          state = #active;
+        };
+
+        try {
           let transferResult = await IrscLedger.icrc1_transfer(
             {
               amount = _amount;
@@ -287,10 +342,54 @@ actor Vaults {
               };
             }
           );
+          switch (transferResult) {
+              case (#Err(transferError)) {
+                return #err("Couldn't mint IRSC :\n" # debug_show (transferError));
+              };
+              case (_) {};
+            };
+        } catch (error : Error) {
+          return #err("Reject message: " # Error.message(error));
+        };
+
+        ignore open_cdps.replace(caller, updated_pos);
+        #ok(updated_pos);
+      };
+    }
+  };
+
+  public shared ({ caller }) func repay_debt( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
+    switch (open_cdps.get(caller)) {
+      case null { #err("You need to have an open position first!") };
+      case (?open_pos) { 
+
+        let balance = await IrscLedger.icrc1_balance_of(
+          toAccount({ caller; canister = Principal.fromActor(Vaults) })
+        );
+
+        if (balance < _amount) {
+          return #err("Not enough funds available in the Account. Make sure you send required IRSC");
+        };
+
+        try {
+          // if enough funds were sent, move them to the canisters default account
+          let transferResult = await IrscLedger.icrc1_transfer(
+            {
+              amount = _amount;
+              from_subaccount = ?toSubaccount(caller);
+              created_at_time = null;
+              fee = null;
+              memo = null;
+              to = {
+                owner = Principal.fromActor(Vaults);
+                subaccount = null;
+              };
+            }
+          );
 
         switch (transferResult) {
             case (#Err(transferError)) {
-              return #err("Couldn't mint IRSC :\n" # debug_show (transferError));
+              return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
             };
             case (_) {};
           };
@@ -298,6 +397,28 @@ actor Vaults {
           return #err("Reject message: " # Error.message(error));
         };
 
-      #ok("Successfully minted " # debug_show(_amount));
-  }
+        let new_debt_issued : Nat = open_pos.debt_issued - _amount;
+
+        if(new_debt_issued < 1) {
+          return #err("Try to close the position instead");
+        };
+
+        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
+        
+        let updated_pos : Types.CDP = {
+          debtor = caller;
+          debt_rate = open_pos.debt_rate;
+          entry_rate = open_pos.entry_rate;
+          liquidation_rate = calc.liquidation_rate;
+          amount = open_pos.amount;
+          max_debt = open_pos.max_debt;
+          debt_issued = new_debt_issued;
+          state = #active;
+        };
+
+        ignore open_cdps.replace(caller, updated_pos);
+        #ok(updated_pos);
+      }
+    };
+  };
 };
