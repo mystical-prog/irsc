@@ -75,7 +75,7 @@ actor Vaults {
               return #err("Reject message: " # Error.message(error));
             };
 
-            let calc = init_position_figures(liquidationRate + _debtrate, num, _amount);
+            let calc = await init_position_figures(liquidationRate + _debtrate, num, _amount, 0);
 
             let new_pos : Types.CDP = {
               debtor = caller;
@@ -191,7 +191,7 @@ actor Vaults {
 
             let new_amount = open_pos.amount + _amount;
             let avg = ((open_pos.amount * open_pos.entry_rate) + ( num * _amount )) / new_amount;
-            let calc = init_position_figures(open_pos.debt_rate, avg, new_amount);
+            let calc = await init_position_figures(open_pos.debt_rate, avg, new_amount, open_pos.debt_issued);
             
             let updated_pos : Types.CDP = {
               debtor = open_pos.debtor;
@@ -222,7 +222,7 @@ actor Vaults {
         };
         
         let new_amount : Nat = open_pos.amount - _amount;
-        let calc = init_position_figures(open_pos.debt_rate, open_pos.entry_rate, new_amount);
+        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, new_amount, open_pos.debt_issued);
         
         if(calc.max_debt <= open_pos.debt_issued) {
           return #err("Repay some of the debt first!");
