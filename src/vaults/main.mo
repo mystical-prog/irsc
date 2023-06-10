@@ -18,7 +18,7 @@ actor Vaults {
   var ckbtcRate : Nat = 21_00_000_00_000_000;
   let liquidationRate : Nat = 135;
   var irscRate = 1_00_000_000;
-  var stabilityRate = 1;
+  var stabilityRate = 10;
   var liquidationFeeRate = 5;
 
   var closed_cdps_count = 0;
@@ -491,7 +491,7 @@ actor Vaults {
           };
         };
 
-        let stabilityFee = (open_pos.volume * stabilityRate) / 100;
+        let stabilityFee = (open_pos.volume * stabilityRate) / 1000;
 
         assert stabilityFee > 0;
 
@@ -559,6 +559,8 @@ actor Vaults {
 
   public func check_positions() : async Result.Result<Text, Text> {
 
+    await update_rates();
+
     var btc_rate = await oracle.getBTC();        
     Result.assertOk(btc_rate);
     let result_val = Result.toOption(btc_rate);
@@ -583,7 +585,7 @@ actor Vaults {
               state = #liquidated;
             };
 
-            let stabilityFee = (cdp.amount * stabilityRate) / 100;
+            let stabilityFee = (cdp.amount * stabilityRate) / 1000;
             let liquidationFee = (cdp.amount * liquidationFeeRate) / 100;
 
             try {
@@ -622,5 +624,32 @@ actor Vaults {
       }
     };
     #ok("Positions Checked");
+  };
+
+  // updates irsc and stabilityFee rates
+  func update_rates() : async () {
+    let irsc_rate = await oracle.updateIRSC(irscRate);
+    irscRate := irsc_rate;
+    if(irsc_rate == 1_00_000_000) {
+      stabilityRate := 10;
+    } else if(irsc_rate > 1_00_000_000 and irsc_rate <=  1_01_000_000) {
+      stabilityRate := 13;
+    } else if(irsc_rate > 1_01_000_000 and irsc_rate <=  1_02_000_000) {
+      stabilityRate := 16;
+    } else if(irsc_rate > 1_02_000_000 and irsc_rate <=  1_03_000_000) {
+      stabilityRate := 19;
+    } else if(irsc_rate > 1_03_000_000 and irsc_rate <=  1_04_000_000) {
+      stabilityRate := 22;
+    } else if(irsc_rate > 1_04_000_000) {
+      stabilityRate := 25;
+    } else if(irsc_rate < 1_00_000_000 and irsc_rate >=  99_000_000) {
+      stabilityRate := 8;
+    } else if(irsc_rate < 99_000_000 and irsc_rate >=  98_000_000) {
+      stabilityRate := 6;
+    } else if(irsc_rate < 98_000_000 and irsc_rate >=  97_000_000) {
+      stabilityRate := 3;
+    } else if(irsc_rate < 97_000_000) {
+      stabilityRate := 1;
+    }
   };
 };
