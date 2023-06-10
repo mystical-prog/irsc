@@ -14,17 +14,18 @@ actor Vaults {
 
   var oracle = actor("be2us-64aaa-aaaaa-qaabq-cai") : Types.oracle;
 
-  stable var ckbtcRate : Nat = 0;
+  var ckbtcRate : Nat = 0;
   let liquidationRate : Nat = 135;
-  var irscRate = 82_25_000_000;
+  var irscRate = 1_00_000_000;
   var stabilityRate = 1;
   var liquidationFeeRate = 5;
 
-  stable var closed_cdps_count = 0;
+  var closed_cdps_count = 0;
+  var liquidated_cdps_count = 0;
 
   var open_cdps = HashMap.HashMap<Principal, Types.CDP>(5, Principal.equal, Principal.hash);
   var closed_cdps = HashMap.HashMap<Text, Types.CDP>(1, Text.equal, Text.hash);
-
+  var liquidated_cdps = HashMap.HashMap<Text, Types.CDP>(1, Text.equal, Text.hash);
 
   public query func getckBTCRate() : async Nat {
     ckbtcRate;
@@ -33,6 +34,7 @@ actor Vaults {
   public shared ({ caller }) func create_cdp( _debtrate : Nat, _amount : Nat ) : async Result.Result<Types.CDP, Text> {
     
     assert _amount > 0;
+    assert _debtrate > 0;
 
     // Check for an already open position.
     switch (open_cdps.get(caller)) {
@@ -554,4 +556,38 @@ actor Vaults {
     };
   };
 
+  public func check_positions() : async Text {
+
+    var btc_rate = await oracle.getBTC();        
+    Result.assertOk(btc_rate);
+    let result_val = Result.toOption(btc_rate);
+
+    switch(result_val) {
+      case null { return "Something is wrong with the APIs" };
+      case (?num) {
+        assert num > 0;
+        ckbtcRate := num;
+
+        for(cdp in open_cdps.vals()) {
+          if(cdp.liquidation_rate < num) {
+            let liquid_cdp : Types.CDP = {
+              debtor = cdp.debtor;
+              debt_rate = cdp.debt_rate;
+              entry_rate = cdp.entry_rate;
+              liquidation_rate = cdp.liquidation_rate;
+              amount = cdp.amount;
+              volume = cdp.volume;
+              max_debt = cdp.max_debt;
+              debt_issued = cdp.debt_issued;
+              state = #liquidated;
+            };
+            ignore open_cdps.remove(cdp.debtor);
+            liquidated_cdps.put(Nat.toText(liquidated_cdps_count), liquid_cdp);
+            liquidated_cdps_count := liquidated_cdps_count + 1;
+          };
+        };
+      }
+    };
+    "Positions Checked";
+  };
 };

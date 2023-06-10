@@ -13,6 +13,14 @@
       "main": "src/oracle/main.mo",
       "type": "motoko"
     },
+    "marketplace": {
+      "main": "src/marketplace/main.mo",
+      "type": "motoko",
+      "dependencies": [
+        "ckbtc_ledger",
+        "irsc_ledger"
+      ] 
+    },
     "ckbtc_ledger" : {
       "type" : "custom",
       "candid" : "icrc1.public.did",
