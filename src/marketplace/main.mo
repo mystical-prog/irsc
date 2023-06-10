@@ -128,6 +128,40 @@ actor Marketplace {
         toAccount({ caller; canister = Principal.fromActor(Marketplace) });
     };
 
+    public shared ({ caller }) func withdraw_from_subAccount_irsc() : async Result.Result<Text, Text> {
+        let balance = await IrscLedger.icrc1_balance_of(
+        toAccount({ caller; canister = Principal.fromActor(Marketplace) })
+        );
+
+        try {
+
+        let transferResult = await IrscLedger.icrc1_transfer(
+            {
+            amount = balance;
+            from_subaccount = ?toSubaccount(caller);
+            created_at_time = null;
+            fee = null;
+            memo = null;
+            to = {
+                owner = caller;
+                subaccount = null;
+            };
+            }
+        );
+
+        switch (transferResult) {
+            case (#Err(transferError)) {
+            return #err("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+            };
+            case (_) {};
+        };
+        } catch (error : Error) {
+        return #err("Reject message: " # Error.message(error));
+        };
+
+        #ok("Transferred " # debug_show(balance) # " IRSC back to your account");
+    };
+
     func toSubaccount(p : Principal) : Subaccount {
         let bytes = Blob.toArray(Principal.toBlob(p));
         let size = bytes.size();

@@ -5,6 +5,7 @@ import Result "mo:base/Result";
 import Hash "mo:base/Hash";
 import CkBtcLedger "canister:ckbtc_ledger";
 import IrscLedger "canister:irsc_ledger";
+import Marketplace "canister:marketplace";
 import { init_position_figures ; toAccount; toSubaccount } "helpers";
 import Error "mo:base/Error";
 import Nat "mo:base/Nat";
@@ -14,7 +15,7 @@ actor Vaults {
 
   var oracle = actor("be2us-64aaa-aaaaa-qaabq-cai") : Types.oracle;
 
-  var ckbtcRate : Nat = 0;
+  var ckbtcRate : Nat = 21_00_000_00_000_000;
   let liquidationRate : Nat = 135;
   var irscRate = 1_00_000_000;
   var stabilityRate = 1;
@@ -117,7 +118,7 @@ actor Vaults {
     toAccount({ caller; canister = Principal.fromActor(Vaults) });
   };
 
-  public shared ({ caller }) func withdraw_from_subAccount_ckBTC() : async Text {
+  public shared ({ caller }) func withdraw_from_subAccount_ckBTC() : async Result.Result<Text, Text> {
     let balance = await CkBtcLedger.icrc1_balance_of(
       toAccount({ caller; canister = Principal.fromActor(Vaults) })
     );
@@ -140,18 +141,18 @@ actor Vaults {
 
       switch (transferResult) {
         case (#Err(transferError)) {
-          return ("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+          return #err("Couldn't transfer funds to required account:\n" # debug_show (transferError));
         };
         case (_) {};
       };
     } catch (error : Error) {
-      return ("Reject message: " # Error.message(error));
+      return #err("Reject message: " # Error.message(error));
     };
 
-    "Transferred " # debug_show(balance) # " ckBTC back to your account";
+    #ok("Transferred " # debug_show(balance) # " ckBTC back to your account");
   };
 
-  public shared ({ caller }) func withdraw_from_subAccount_irsc() : async Text {
+  public shared ({ caller }) func withdraw_from_subAccount_irsc() : async Result.Result<Text, Text> {
     let balance = await IrscLedger.icrc1_balance_of(
       toAccount({ caller; canister = Principal.fromActor(Vaults) })
     );
@@ -174,15 +175,15 @@ actor Vaults {
 
       switch (transferResult) {
         case (#Err(transferError)) {
-          return ("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+          return #err("Couldn't transfer funds to required account:\n" # debug_show (transferError));
         };
         case (_) {};
       };
     } catch (error : Error) {
-      return ("Reject message: " # Error.message(error));
+      return #err("Reject message: " # Error.message(error));
     };
 
-    "Transferred " # debug_show(balance) # " IRSC back to your account";
+    #ok("Transferred " # debug_show(balance) # " IRSC back to your account");
   };
 
   public shared ({ caller }) func add_collateral( _amount : Nat ) : async Result.Result<Types.CDP, Text> {
@@ -556,20 +557,20 @@ actor Vaults {
     };
   };
 
-  public func check_positions() : async Text {
+  public func check_positions() : async Result.Result<Text, Text> {
 
     var btc_rate = await oracle.getBTC();        
     Result.assertOk(btc_rate);
     let result_val = Result.toOption(btc_rate);
 
     switch(result_val) {
-      case null { return "Something is wrong with the APIs" };
+      case null { return #err("Something is wrong with the APIs") };
       case (?num) {
         assert num > 0;
         ckbtcRate := num;
 
         for(cdp in open_cdps.vals()) {
-          if(cdp.liquidation_rate < num) {
+          if(cdp.liquidation_rate > num) {
             let liquid_cdp : Types.CDP = {
               debtor = cdp.debtor;
               debt_rate = cdp.debt_rate;
@@ -581,6 +582,38 @@ actor Vaults {
               debt_issued = cdp.debt_issued;
               state = #liquidated;
             };
+
+            let stabilityFee = (cdp.amount * stabilityRate) / 100;
+            let liquidationFee = (cdp.amount * liquidationFeeRate) / 100;
+
+            try {
+
+              let transferResult = await CkBtcLedger.icrc1_transfer(
+                {
+                  amount = cdp.amount - (stabilityFee + liquidationFee);
+                  from_subaccount = null;
+                  created_at_time = null;
+                  fee = null;
+                  memo = null;
+                  to = {
+                    owner = Principal.fromText("bw4dl-smaaa-aaaaa-qaacq-cai");
+                    subaccount = null;
+                  };
+                }
+              );
+
+              switch (transferResult) {
+                case (#Err(transferError)) {
+                  return #err("Couldn't transfer funds to required account:\n" # debug_show (transferError));
+                };
+                case (_) {};
+              };
+            } catch (error : Error) {
+              return #err("Reject message: " # Error.message(error));
+            };
+
+            ignore await Marketplace.list(cdp.amount - (stabilityFee + liquidationFee),cdp.debt_issued);
+
             ignore open_cdps.remove(cdp.debtor);
             liquidated_cdps.put(Nat.toText(liquidated_cdps_count), liquid_cdp);
             liquidated_cdps_count := liquidated_cdps_count + 1;
@@ -588,6 +621,6 @@ actor Vaults {
         };
       }
     };
-    "Positions Checked";
+    #ok("Positions Checked");
   };
 };
