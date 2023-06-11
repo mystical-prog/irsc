@@ -35,7 +35,7 @@ actor Vaults {
   public shared ({ caller }) func create_cdp( _debtrate : Nat, _amount : Nat ) : async Result.Result<Types.CDP, Text> {
     
     assert _amount > 0;
-    assert _debtrate > 0;
+    assert _debtrate > 1;
 
     // Check for an already open position.
     switch (open_cdps.get(caller)) {
@@ -426,7 +426,7 @@ actor Vaults {
 
         let new_debt_issued : Nat = open_pos.debt_issued - _amount;
 
-        if(new_debt_issued < 1) {
+        if(new_debt_issued < 0) {
           return #err("Try to close the position instead");
         };
 
@@ -450,6 +450,58 @@ actor Vaults {
     };
   };
 
+  public shared ({ caller }) func adjust_debtRate( new_rate : Nat ) : async Result.Result<Types.CDP, Text> {
+    
+    assert new_rate > 1;
+    
+    switch(open_cdps.get(caller)){
+      case null { return #err("You need to have an open position first") };
+      case (?open_pos) {
+
+        if(liquidationRate + new_rate == open_pos.debt_rate) {
+          return #err("New rate cannot be the same as old rate");
+        };
+
+        var btc_rate = await oracle.getBTC();
+        Result.assertOk(btc_rate);
+        let result_val = Result.toOption(btc_rate);
+
+        switch(result_val) {
+          case null { return #err("There is something wrong with the oracle!") };
+          case (?num) {
+
+            ckbtcRate := num;
+            
+            let calc = await init_position_figures(liquidationRate + new_rate, open_pos.entry_rate, open_pos.amount, open_pos.debt_issued);
+
+            if(calc.max_debt < open_pos.debt_issued) {
+              return #err("Cannot adjust the rate as debt issued is higher than the new max debt");
+            };
+
+            if(calc.liquidation_rate > num) {
+              return #err("Cannot adjust the rate as new liquidation rate is higher than the current price");
+            };
+
+            let updated_pos : Types.CDP = {
+              debtor = open_pos.debtor;
+              amount = open_pos.amount;
+              volume = open_pos.volume;
+              debt_rate = liquidationRate + new_rate;
+              entry_rate = open_pos.entry_rate;
+              liquidation_rate = calc.liquidation_rate;
+              max_debt = calc.max_debt;
+              debt_issued = open_pos.debt_issued;
+              state = #active
+            };
+
+            ignore open_cdps.replace(caller, updated_pos);
+            #ok(updated_pos);
+          }
+        }
+      };
+    }
+  };
+ 
   public shared ({ caller }) func close_position() : async Result.Result<Types.CDP, Text> {
     switch (open_cdps.get(caller)) {
       case null { #err("You need to have an open position first!") };
