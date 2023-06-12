@@ -14,6 +14,13 @@
       "main": "src/oracle/main.mo",
       "type": "motoko"
     },
+    "ticking_canister": {
+      "main": "src/ticking_canister/main.mo",
+      "type": "motoko",
+      "dependencies": [
+        "vaults"
+      ] 
+    },
     "marketplace": {
       "main": "src/marketplace/main.mo",
       "type": "motoko",
