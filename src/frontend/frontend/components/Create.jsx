@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 function Create() {
   const [numberInput, setNumberInput] = useState("");
@@ -84,7 +84,7 @@ function Create() {
         </div>
       </form>
     </div>
-  );
+  )
 }
 
 export default Create;
