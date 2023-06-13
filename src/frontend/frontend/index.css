@@ -1,3 +1,28 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+@font-face {
+    font-family: Coiny;
+    src: url("assets/ComicNeue-Regular.ttf") format("truetype");
+}
+
+@layer components {
+  .animate-gradient-y {
+    animation: gradient-y 15s ease-in-out infinite;
+  }
+  @keyframes gradient-y {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(100%);
+    }
+  }
+}

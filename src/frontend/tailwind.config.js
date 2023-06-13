@@ -16,6 +16,12 @@ module.exports = {
       'bubble-gum': '#ff77e9',
       'bermuda': '#78dcca',
       'text' : '#f99a36',
+      'purple' : '#6c2484',
+    },
+    extend: {
+      fontFamily: {
+        primary: "Coiny",
+      },
     },
   },
   plugins: [],
