@@ -17,6 +17,7 @@ import "@connect2ic/core/style.css"
 // import { Counter } from "./components/Counter"
 import { Transfer } from "./components/Transfer"
 import { Profile } from "./components/Profile"
+import Create from "./components/Create"
 
 function App() {
 
@@ -40,9 +41,7 @@ function App() {
         Examples
       </p>
       <div className="examples">
-        
-        <Profile />
-        <Transfer />
+        <Create />
       </div>
 
     </div>
