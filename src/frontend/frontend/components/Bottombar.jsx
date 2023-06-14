@@ -10,7 +10,7 @@ const Bottombar = () => {
   ];
 
   return (
-    <div className="border-t-2 border-silver fixed inset-x-0 bottom-0 text-silver p-2 shadow-lg">
+    <div className="bg-gradient-to-r from-background to-purple border-t-2 border-silver fixed inset-x-0 bottom-0 text-silver p-2 shadow-lg">
       <div className="flex justify-around">
         {currencies.map((currency, index) => (
           <div key={index} className="text-center">
