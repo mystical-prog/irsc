@@ -110,12 +110,30 @@ actor Vaults {
     }
   };
 
-  public shared ({ caller }) func get_current_cdp() : async ?Types.CDP {
-    open_cdps.get(caller);
+  public shared ({ caller }) func get_current_cdp() : async Result.Result<Types.CDP, Text> {
+    switch(open_cdps.get(caller)) {
+      case null {return #err("You don't have any open position!!")};
+      case (?open_pos) {
+        return #ok(open_pos);
+      }
+    }
+  };
+
+  public func get_current_cdp_with_principal( user : Principal ) : async Result.Result<Types.CDP, Text> {
+    switch(open_cdps.get(user)) {
+      case null {return #err("You don't have any open position!!")};
+      case (?open_pos) {
+        return #ok(open_pos);
+      }
+    }
   };
 
   public shared ({ caller }) func get_subAccount() : async Types.Account {
     toAccount({ caller; canister = Principal.fromActor(Vaults) });
+  };
+
+  public func get_subAccount_with_principal( user : Principal ) : async Types.Account {
+    toAccount({ caller = user; canister = Principal.fromActor(Vaults) });
   };
 
   public shared ({ caller }) func withdraw_from_subAccount_ckBTC() : async Result.Result<Text, Text> {

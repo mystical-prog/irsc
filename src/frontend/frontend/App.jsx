@@ -1,56 +1,43 @@
-import React from "react"
-import logo from "./assets/dfinity.svg"
+import React from "react";
+import { BrowserRouter as Router, Route, Routes} from "react-router-dom";
 /*
  * Connect2ic provides essential utilities for IC app development
  */
 import { createClient } from "@connect2ic/core"
 import { defaultProviders } from "@connect2ic/core/providers"
-import { ConnectButton, ConnectDialog, Connect2ICProvider } from "@connect2ic/react"
+import { Connect2ICProvider } from "@connect2ic/react"
 import "@connect2ic/core/style.css"
 /*
  * Import canister definitions like this:
  */
-// import * as counter from "../.dfx/local/canisters/counter"
+ import * as vaults from "../.dfx/local/canisters/vaults";
 /*
  * Some examples to get you started
  */
-// import { Counter } from "./components/Counter"
-import { Transfer } from "./components/Transfer"
-import { Profile } from "./components/Profile"
 import Create from "./components/Create"
+import Navbar from "./components/Navbar"
+import Bottombar from "./components/Bottombar"
+import Interaction from "./components/Interaction";
 
 function App() {
 
   return (
     <div className="App">
-
-      <div className="auth-section">
-        <ConnectButton />
-      </div>
-      <ConnectDialog />
-
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p className="slogan">
-          React Template
-        </p>
-        <p className="twitter">by <a href="https://twitter.com/miamaruq">@miamaruq</a></p>
-      </header>
-
-      <p className="examples-title">
-        Examples
-      </p>
-      <div className="examples">
-        <Create />
-      </div>
-
+      <Navbar />
+      <Router>
+        <Routes>
+          <Route path="/create" element={<Create />} />
+          <Route path="/interact" element={<Interaction />} />
+        </Routes>
+      </Router>
+      <Bottombar />
     </div>
   )
 }
 
 const client = createClient({
   canisters: {
-    
+    vaults
   },
   providers: defaultProviders,
   globalProviderConfig: {

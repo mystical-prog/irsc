@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
+import { useCanister } from '@connect2ic/react';
 
 function Create() {
+
+  const [vaults] = useCanister("vaults");
   const [numberInput, setNumberInput] = useState("");
   const [sliderInput, setSliderInput] = useState(137);
 
@@ -12,17 +15,33 @@ function Create() {
     setSliderInput(e.target.value);
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // handle form submission
+  const handleSubAccount = async () => {
+    const res = await vaults.get_subAccount();
+    console.log(res);
+  };
+
+  const handleSubmit = async () => {
+    if(sliderInput > 136 && sliderInput < 161 && numberInput >= 0.0001){
+      const res = await vaults.create_cdp(Number(sliderInput - 135), Number(numberInput * 10**8));
+      
+      //
+      // Put an if res.ok check here!!
+      //
+      
+      console.log(res);
+      if(res.ok) {
+        alert("Succesfully created your position!!");
+      }
+    } else {
+      alert("Please enter valid values to create a CDP!")
+    }
   };
 
   return (
     <div className="bg-gradient-to-r from-background to-purple flex items-center justify-center min-h-screen bg-gray-100">
-      <form 
+      <div 
         className="bg-primary shadow-xl rounded-xl px-10 pt-10 pb-10 mb-4 border-2 border-silver" 
         style={{ width: '400px' }} 
-        onSubmit={handleSubmit}
       >
         <div className="mb-4">
           <h2 className="text-center text-blue-600 text-3xl font-bold mb-4 font-primary">Create CDP</h2>
@@ -78,11 +97,19 @@ function Create() {
           <button 
             className="font-primary bg-secondary hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-full shadow-lg transform transition-shadow duration-500 ease-in-out hover:shadow-2xl focus:outline-none" 
             type="submit"
+            onClick={handleSubmit}
           >
             Create
           </button>
+          <button 
+            className="font-primary m-l-4 bg-secondary hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-full shadow-lg transform transition-shadow duration-500 ease-in-out hover:shadow-2xl focus:outline-none" 
+            type="submit"
+            onClick={handleSubAccount}
+          >
+            SubAccount
+          </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

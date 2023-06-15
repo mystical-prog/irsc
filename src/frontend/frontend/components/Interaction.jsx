@@ -1,7 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useCanister, useWallet } from '@connect2ic/react';
+import { Principal } from '@dfinity/principal';
 
 const Interaction = () => {
-  const data = {
+
+  const [vaults] = useCanister("vaults");
+  const [wallet] = useWallet();
+
+  const [data, setData] = useState({
     Entry_Rate: '25,00,000',
     Liquidation_Rate: '24,20,000',
     Amount: 10000,
@@ -9,11 +15,17 @@ const Interaction = () => {
     Max_Issuable_IRSC : 64.9820,
     Issued_IRSC : 20.455,
     Volume : 11000,
-  };
+  });
 
   const [activeTab, setActiveTab] = useState(0);
   const [sliderInput, setSliderInput] = useState(137);
   const [numberInput, setNumberInput] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  const fetchCDP = async () => {
+    const res = await vaults.get_current_cdp();
+    console.log(res);
+  }
 
   const handleSliderChange = (e) => {
     setSliderInput(e.target.value);
@@ -97,6 +109,27 @@ const Interaction = () => {
     </div>
   );
 
+  useEffect(() => {
+    (async () => {
+      await window.ic.plug.requestConnect();
+      const res = await vaults.get_current_cdp_with_principal(Principal.fromText(window.ic.plug.principalId));
+      console.log(res);
+      if(res.ok) {
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        setLoaded(true);
+      } else {
+        alert("You don't have any active positions!");
+        window.location.href = "/create";
+      }
+    })();
+  }, []);
+
   return (
     <div className="flex flex-col items-center bg-gradient-to-r from-background to-purple p-6 rounded-lg shadow-lg h-screen">
       <h2 className="text-3xl font-bold text-silver font-primary my-6 border-b-2">CDP Interaction</h2>
@@ -107,7 +140,7 @@ const Interaction = () => {
           {Object.entries(data).map(([key, value]) => (
             <div className="flex justify-between w-full mb-4 px-4 text-text font-primary font-bold" key={key}>
               <strong className="text-left">{key.replaceAll('_', ' ')} -</strong>
-              <span className='text-secondary font-primary font-bold text-l'>{value}</span>
+              <span className='text-secondary font-primary font-bold text-l'>{loaded ? value : ""}</span>
             </div>
           ))}
         </div>
