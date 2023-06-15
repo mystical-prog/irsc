@@ -5,11 +5,14 @@ import Array "mo:base/Array";
 import Principal "mo:base/Principal";
 import Nat8 "mo:base/Nat8";
 import Debug "mo:base/Debug";
+import Result "mo:base/Result";
+import Error "mo:base/Error";
 
 module {
 
-    public func init_position_figures( debt_rate : Nat, entry_rate : Nat, amount : Nat, used_debt : Nat ) : async Types.Helper_Return1 {
+    public func init_position_figures( debt_rate : Nat, entry_rate : Nat, amount : Nat, used_debt : Nat ) : async Result.Result<Types.Helper_Return1, Text> {
 
+        try {
         let half_value : Nat = (amount * entry_rate) / 200_000_000;
 
         let sur : Nat = (half_value * (debt_rate - 100)) / 100;
@@ -28,7 +31,10 @@ module {
             liquidation_rate = liquidation_rate;
         };
 
-        return_val;
+        #ok(return_val);
+        } catch (error : Error) {
+            return #err("Reject message: " # Error.message(error));
+        };
     };
 
     public func toSubaccount(p : Principal) : Types.Subaccount {

@@ -34,7 +34,7 @@ actor Vaults {
 
   public shared ({ caller }) func create_cdp( _debtrate : Nat, _amount : Nat ) : async Result.Result<Types.CDP, Text> {
     
-    assert _amount > 0;
+    assert _amount > 100;
     assert _debtrate > 1;
 
     // Check for an already open position.
@@ -79,28 +79,34 @@ actor Vaults {
                 case (#Err(transferError)) {
                   return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
                 };
-                case (_) {};
+                case (_) {
+
+                  let temp_calc = await init_position_figures(liquidationRate + _debtrate, num, _amount, 0);
+                  Result.assertOk(temp_calc);
+                  let result_calc = Result.toOption(temp_calc);
+                  switch(result_calc) {
+                    case null { return #err("Something is wrong") };
+                    case (?calc) { 
+                    let new_pos : Types.CDP = {
+                      debtor = caller;
+                      amount = _amount;
+                      volume = _amount;
+                      debt_rate = liquidationRate + _debtrate;
+                      entry_rate = num;
+                      liquidation_rate = calc.liquidation_rate;
+                      max_debt = calc.max_debt;
+                      debt_issued = 0;
+                      state = #active
+                    };
+
+                    open_cdps.put(caller, new_pos);
+                    return #ok(new_pos);
+                  }}
+                };
               };
             } catch (error : Error) {
               return #err("Reject message: " # Error.message(error));
             };
-
-            let calc = await init_position_figures(liquidationRate + _debtrate, num, _amount, 0);
-
-            let new_pos : Types.CDP = {
-              debtor = caller;
-              amount = _amount;
-              volume = _amount;
-              debt_rate = liquidationRate + _debtrate;
-              entry_rate = num;
-              liquidation_rate = calc.liquidation_rate;
-              max_debt = calc.max_debt;
-              debt_issued = 0;
-              state = #active
-            };
-
-            open_cdps.put(caller, new_pos);
-            return #ok(new_pos);
           }
         }
        };
@@ -249,31 +255,37 @@ actor Vaults {
                 case (#Err(transferError)) {
                   return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
                 };
-                case (_) {};
+                case (_) {
+                  let new_amount = open_pos.amount + _amount;
+                  let avg = ((open_pos.amount * open_pos.entry_rate) + ( num * _amount )) / new_amount;
+                  let temp_calc = await init_position_figures(open_pos.debt_rate, avg, new_amount, open_pos.debt_issued);
+                  let new_volume = open_pos.volume + _amount;
+
+                  Result.assertOk(temp_calc);
+                  let result_calc = Result.toOption(temp_calc);
+                  switch(result_calc) {
+                    case null { return #err("Something is wrong") };
+                    case (?calc) { 
+                    let updated_pos : Types.CDP = {
+                      debtor = open_pos.debtor;
+                      amount = new_amount;
+                      volume = new_volume;
+                      debt_rate = open_pos.debt_rate;
+                      entry_rate = avg;
+                      liquidation_rate = calc.liquidation_rate;
+                      max_debt = calc.max_debt;
+                      debt_issued = open_pos.debt_issued;
+                      state = #active
+                    };
+
+                    ignore open_cdps.replace(caller, updated_pos);
+                    #ok(updated_pos);
+                  }}
+                };
               };
             } catch (error : Error) {
               return #err("Reject message: " # Error.message(error));
             };
-
-            let new_amount = open_pos.amount + _amount;
-            let avg = ((open_pos.amount * open_pos.entry_rate) + ( num * _amount )) / new_amount;
-            let calc = await init_position_figures(open_pos.debt_rate, avg, new_amount, open_pos.debt_issued);
-            let new_volume = open_pos.volume + _amount;
-
-            let updated_pos : Types.CDP = {
-              debtor = open_pos.debtor;
-              amount = new_amount;
-              volume = new_volume;
-              debt_rate = open_pos.debt_rate;
-              entry_rate = avg;
-              liquidation_rate = calc.liquidation_rate;
-              max_debt = calc.max_debt;
-              debt_issued = open_pos.debt_issued;
-              state = #active
-            };
-
-            ignore open_cdps.replace(caller, updated_pos);
-            #ok(updated_pos);
           }
         }
       }
@@ -293,52 +305,59 @@ actor Vaults {
         };
         
         let new_amount : Nat = open_pos.amount - _amount;
-        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, new_amount, open_pos.debt_issued);
+        let temp_calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, new_amount, open_pos.debt_issued);
+
+        Result.assertOk(temp_calc);
+        let result_calc = Result.toOption(temp_calc);
+        switch(result_calc) {
+          case null { return #err("Something is wrong") };
+          case (?calc) { 
         
-        if(calc.max_debt <= open_pos.debt_issued) {
-          return #err("Repay some of the debt first!");
-        };
-
-        let updated_pos : Types.CDP = {
-          debtor = open_pos.debtor;
-          amount = new_amount;
-          volume = open_pos.volume;
-          debt_rate = open_pos.debt_rate;
-          entry_rate = open_pos.entry_rate;
-          liquidation_rate = calc.liquidation_rate;
-          max_debt = calc.max_debt;
-          debt_issued = open_pos.debt_issued;
-          state = #active
-        };
-
-        ignore open_cdps.replace(caller, updated_pos);
-        
-        try {
-
-          let transferResult = await CkBtcLedger.icrc1_transfer(
-            {
-              amount = _amount;
-              from_subaccount = null;
-              created_at_time = null;
-              fee = null;
-              memo = null;
-              to = {
-                owner = caller;
-                subaccount = null;
-              };
-            }
-          );
-
-        switch (transferResult) {
-            case (#Err(transferError)) {
-              return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
-            };
-            case (_) {};
+          if(calc.max_debt <= open_pos.debt_issued) {
+            return #err("Repay some of the debt first!");
           };
-        } catch (error : Error) {
-          return #err("Reject message: " # Error.message(error));
-        };
+
+          let updated_pos : Types.CDP = {
+            debtor = open_pos.debtor;
+            amount = new_amount;
+            volume = open_pos.volume;
+            debt_rate = open_pos.debt_rate;
+            entry_rate = open_pos.entry_rate;
+            liquidation_rate = calc.liquidation_rate;
+            max_debt = calc.max_debt;
+            debt_issued = open_pos.debt_issued;
+            state = #active
+          };
+
+          ignore open_cdps.replace(caller, updated_pos);
+        
+          try {
+
+            let transferResult = await CkBtcLedger.icrc1_transfer(
+              {
+                amount = _amount;
+                from_subaccount = null;
+                created_at_time = null;
+                fee = null;
+                memo = null;
+                to = {
+                  owner = caller;
+                  subaccount = null;
+                };
+              }
+            );
+
+          switch (transferResult) {
+              case (#Err(transferError)) {
+                return #err("Couldn't transfer funds to default account:\n" # debug_show (transferError));
+              };
+              case (_) {};
+            };
+          } catch (error : Error) {
+            return #err("Reject message: " # Error.message(error));
+          };
         #ok(updated_pos);
+        }}
       }
     };
   };
@@ -356,46 +375,52 @@ actor Vaults {
         };
 
         let new_debt_issued = open_pos.debt_issued + _amount;
-        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
+        let temp_calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
+        Result.assertOk(temp_calc);
+        let result_calc = Result.toOption(temp_calc);
+        switch(result_calc) {
+          case null { return #err("Something is wrong") };
+          case (?calc) { 
 
-        let updated_pos : Types.CDP = {
-          debtor = caller;
-          debt_rate = open_pos.debt_rate;
-          entry_rate = open_pos.entry_rate;
-          liquidation_rate = calc.liquidation_rate;
-          amount = open_pos.amount;
-          volume = open_pos.volume;
-          max_debt = open_pos.max_debt;
-          debt_issued = new_debt_issued;
-          state = #active;
-        };
+          let updated_pos : Types.CDP = {
+            debtor = caller;
+            debt_rate = open_pos.debt_rate;
+            entry_rate = open_pos.entry_rate;
+            liquidation_rate = calc.liquidation_rate;
+            amount = open_pos.amount;
+            volume = open_pos.volume;
+            max_debt = open_pos.max_debt;
+            debt_issued = new_debt_issued;
+            state = #active;
+          };
 
-        try {
-          let transferResult = await IrscLedger.icrc1_transfer(
-            {
-              amount = _amount;
-              from_subaccount = null;
-              created_at_time = null;
-              fee = null;
-              memo = null;
-              to = {
-                owner = caller;
-                subaccount = null;
+          try {
+            let transferResult = await IrscLedger.icrc1_transfer(
+              {
+                amount = _amount;
+                from_subaccount = null;
+                created_at_time = null;
+                fee = null;
+                memo = null;
+                to = {
+                  owner = caller;
+                  subaccount = null;
+                };
+              }
+            );
+            switch (transferResult) {
+                case (#Err(transferError)) {
+                  return #err("Couldn't mint IRSC :\n" # debug_show (transferError));
+                };
+                case (_) {};
               };
-            }
-          );
-          switch (transferResult) {
-              case (#Err(transferError)) {
-                return #err("Couldn't mint IRSC :\n" # debug_show (transferError));
-              };
-              case (_) {};
-            };
-        } catch (error : Error) {
-          return #err("Reject message: " # Error.message(error));
-        };
+          } catch (error : Error) {
+            return #err("Reject message: " # Error.message(error));
+          };
 
-        ignore open_cdps.replace(caller, updated_pos);
-        #ok(updated_pos);
+          ignore open_cdps.replace(caller, updated_pos);
+          #ok(updated_pos);
+        }}
       };
     }
   };
@@ -448,22 +473,28 @@ actor Vaults {
           return #err("Try to close the position instead");
         };
 
-        let calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
-        
-        let updated_pos : Types.CDP = {
-          debtor = caller;
-          debt_rate = open_pos.debt_rate;
-          entry_rate = open_pos.entry_rate;
-          liquidation_rate = calc.liquidation_rate;
-          amount = open_pos.amount;
-          volume = open_pos.volume;
-          max_debt = open_pos.max_debt;
-          debt_issued = new_debt_issued;
-          state = #active;
-        };
+        let temp_calc = await init_position_figures(open_pos.debt_rate, open_pos.entry_rate, open_pos.amount, new_debt_issued);
+        Result.assertOk(temp_calc);
+        let result_calc = Result.toOption(temp_calc);
+        switch(result_calc) {
+          case null { return #err("Something is wrong") };
+          case (?calc) { 
 
-        ignore open_cdps.replace(caller, updated_pos);
-        #ok(updated_pos);
+          let updated_pos : Types.CDP = {
+            debtor = caller;
+            debt_rate = open_pos.debt_rate;
+            entry_rate = open_pos.entry_rate;
+            liquidation_rate = calc.liquidation_rate;
+            amount = open_pos.amount;
+            volume = open_pos.volume;
+            max_debt = open_pos.max_debt;
+            debt_issued = new_debt_issued;
+            state = #active;
+          };
+
+          ignore open_cdps.replace(caller, updated_pos);
+          #ok(updated_pos);
+        }}
       }
     };
   };
@@ -490,30 +521,36 @@ actor Vaults {
 
             ckbtcRate := num;
             
-            let calc = await init_position_figures(liquidationRate + new_rate, open_pos.entry_rate, open_pos.amount, open_pos.debt_issued);
+            let temp_calc = await init_position_figures(liquidationRate + new_rate, open_pos.entry_rate, open_pos.amount, open_pos.debt_issued);
+            Result.assertOk(temp_calc);
+            let result_calc = Result.toOption(temp_calc);
+            switch(result_calc) {
+              case null { return #err("Something is wrong") };
+              case (?calc) { 
 
-            if(calc.max_debt < open_pos.debt_issued) {
-              return #err("Cannot adjust the rate as debt issued is higher than the new max debt");
-            };
+              if(calc.max_debt < open_pos.debt_issued) {
+                return #err("Cannot adjust the rate as debt issued is higher than the new max debt");
+              };
 
-            if(calc.liquidation_rate > num) {
-              return #err("Cannot adjust the rate as new liquidation rate is higher than the current price");
-            };
+              if(calc.liquidation_rate > num) {
+                return #err("Cannot adjust the rate as new liquidation rate is higher than the current price");
+              };
 
-            let updated_pos : Types.CDP = {
-              debtor = open_pos.debtor;
-              amount = open_pos.amount;
-              volume = open_pos.volume;
-              debt_rate = liquidationRate + new_rate;
-              entry_rate = open_pos.entry_rate;
-              liquidation_rate = calc.liquidation_rate;
-              max_debt = calc.max_debt;
-              debt_issued = open_pos.debt_issued;
-              state = #active
-            };
+              let updated_pos : Types.CDP = {
+                debtor = open_pos.debtor;
+                amount = open_pos.amount;
+                volume = open_pos.volume;
+                debt_rate = liquidationRate + new_rate;
+                entry_rate = open_pos.entry_rate;
+                liquidation_rate = calc.liquidation_rate;
+                max_debt = calc.max_debt;
+                debt_issued = open_pos.debt_issued;
+                state = #active
+              };
 
-            ignore open_cdps.replace(caller, updated_pos);
-            #ok(updated_pos);
+              ignore open_cdps.replace(caller, updated_pos);
+              #ok(updated_pos);
+              }}
           }
         }
       };
