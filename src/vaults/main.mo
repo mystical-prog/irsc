@@ -32,6 +32,18 @@ actor Vaults {
     ckbtcRate;
   };
 
+  public query func getIrscRate() : async Nat {
+    irscRate;
+  };
+
+  public query func getStabilityRate() : async Nat {
+    stabilityRate;
+  };
+
+  public query func getLiquidationRate() : async Nat {
+    liquidationFeeRate;
+  };
+
   public shared ({ caller }) func create_cdp( _debtrate : Nat, _amount : Nat ) : async Result.Result<Types.CDP, Text> {
     
     assert _amount > 100;

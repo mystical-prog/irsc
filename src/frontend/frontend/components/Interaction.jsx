@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useCanister } from '@connect2ic/react';
-import { Principal } from '@dfinity/principal';
 
 const Interaction = () => {
 

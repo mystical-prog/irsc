@@ -59,9 +59,9 @@ actor {
         if( num % 3 == 0) {
           return (rate);
         } else if ( num % 3 == 1 ) {
-          return (rate + 5_000_000);
+          return (rate + 5_00_000);
         } else {
-          return (rate - 5_000_000);
+          return (rate - 5_00_000);
         }
       };
     };

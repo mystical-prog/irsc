@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCanister } from '@connect2ic/react';
 
 function Create() {
@@ -6,6 +6,7 @@ function Create() {
   const [vaults] = useCanister("vaults");
   const [numberInput, setNumberInput] = useState("");
   const [sliderInput, setSliderInput] = useState(137);
+  const [btcRate, setBtcRate] = useState(2200000);
 
   const handleNumberChange = (e) => {
     setNumberInput(e.target.value);
@@ -21,21 +22,27 @@ function Create() {
   };
 
   const handleSubmit = async () => {
-    if(sliderInput > 136 && sliderInput < 161 && numberInput >= 0.001){
+    if(sliderInput > 136 && sliderInput < 161 && numberInput >= 0.0001){
       const res = await vaults.create_cdp(Number(sliderInput - 135), Number(numberInput * 10**8));
-      
-      //
-      // Put an if res.ok check here!!
-      //
       
       console.log(res);
       if(res.ok) {
         alert("Succesfully created your position!!");
+        window.location.href = "/interact";
+      } else {
+        alert("Something went wrong - " + res.err.toString());
       }
     } else {
       alert("Please enter valid values to create a CDP!")
     }
   };
+
+  useEffect(() => {
+    (async () => {
+      const temp_btc = await vaults.getckBTCRate();
+      setBtcRate(Math.trunc(Number(temp_btc) / 100000000));
+    })();
+  }, []);
 
   return (
     <div className="bg-gradient-to-r from-background to-purple flex items-center justify-center min-h-screen bg-gray-100">
@@ -64,7 +71,7 @@ function Create() {
             value={numberInput}
             onChange={handleNumberChange} 
           />
-          <span className='text-sm text-gray-700 font-primary font-bold'>&#8764; 139</span><span className='text-sm text-gray-700 font-bold'>&#8377;</span>
+          <span className='text-sm text-gray-700 font-primary font-bold'>&#8764; {numberInput * btcRate}</span><span className='text-sm text-gray-700 font-bold'>&#8377;</span>
         </div>
 
         <hr className="my-6 border-t border-gray-200" />
