@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useCanister, useWallet } from '@connect2ic/react';
+import { useCanister } from '@connect2ic/react';
 import { Principal } from '@dfinity/principal';
 
 const Interaction = () => {
 
   const [vaults] = useCanister("vaults");
-  const [wallet] = useWallet();
 
   const [data, setData] = useState({
     Entry_Rate: '25,00,000',
@@ -20,11 +19,28 @@ const Interaction = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [sliderInput, setSliderInput] = useState(137);
   const [numberInput, setNumberInput] = useState("");
-  const [loaded, setLoaded] = useState(false);
+  const [init, setInit] = useState(false);
+  const [loaded, setLoaded] = useState(true);
 
-  const fetchCDP = async () => {
+  const handleFetch = async () => {
+    setInit(false);
+    setLoaded(false);
     const res = await vaults.get_current_cdp();
     console.log(res);
+    if(res.ok) {
+      data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+      data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+      data.Volume = Number(res.ok.volume) / 100000000;
+      data.Amount = Number(res.ok.amount) / 100000000;
+      data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+      data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+      data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+      setLoaded(true);
+      setInit(true);
+    } else {
+      alert("You don't have any active positions!");
+      window.location.href = "/create";
+    }
   }
 
   const handleSliderChange = (e) => {
@@ -35,28 +51,125 @@ const Interaction = () => {
     setNumberInput(e.target.value);
   };
 
-  const handleRemove = () => {
-    alert("Remove");
+  const handleRemove = async () => {
+    if(loaded) {
+      setLoaded(false);
+      const res = await vaults.remove_collateral(Number(numberInput) * 100000000);
+      if(res.ok){
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        alert("Operation performed successfully!");
+        setLoaded(true);
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
   
-  const handleAdd = () => {
-    alert("Add");
+  const handleAdd = async () => {
+    if(loaded == true) {
+      setLoaded(false);
+      const res = await vaults.add_collateral(Number(numberInput) * 100000000);
+      if(res.ok){
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        alert("Operation performed successfully!");
+        setLoaded(true);
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
 
-  const handleIssue = () => {
-    alert("Issue");
+  const handleIssue = async () => {
+    if(loaded == true) {
+      setLoaded(false);
+      const res = await vaults.issue_debt(Number(numberInput) * 100000000);
+      console.log(res);
+      if(res.ok){
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        alert("Operation performed successfully!");
+        setLoaded(true);
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
 
-  const handleRepay = () => {
-    alert("Repay");
+  const handleRepay = async () => {
+    if(loaded) {
+      setLoaded(false);
+      const res = await vaults.repay_debt(Number(numberInput) * 100000000);
+      if(res.ok){
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        alert("Operation performed successfully!");
+        setLoaded(true);
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
 
-  const handleClose = () => {
-    alert("Close");
+  const handleClose = async () => {
+    if(loaded) {
+      setLoaded(false);
+      const res = await vaults.repay_debt(Number(numberInput) * 100000000);
+      if(res.ok){
+        alert("Position closed successfully!");
+        setLoaded(true);
+        window.location.href = "/create";
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
 
-  const handleAdjust = () => {
-    alert("Adjust");
+  const handleAdjust = async () => {
+    if(loaded) {
+      setLoaded(false);
+      const res = await vaults.adjust_debtRate(Number(sliderInput - 135));
+      if(res.ok){
+        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
+        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
+        data.Volume = Number(res.ok.volume) / 100000000;
+        data.Amount = Number(res.ok.amount) / 100000000;
+        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
+        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
+        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
+        alert("Operation performed successfully!");
+        setLoaded(true);
+      } else {
+        alert("Couldn't perform the operation!" + res.err.toString());
+        setLoaded(true);
+      }
+    }
   };
 
   const tabs = [
@@ -105,34 +218,18 @@ const Interaction = () => {
           )}
         </div>
       )}
-      <button className="px-4 py-2 rounded-lg bg-secondary text-silver" onClick={tab.func}>{tab.btnText}</button>
+      <button className="px-4 py-2 rounded-lg bg-secondary text-silver" onClick={tab.func}>{loaded ? tab.btnText : "Loading.."}</button>
     </div>
   );
 
-  useEffect(() => {
-    (async () => {
-      await window.ic.plug.requestConnect();
-      const res = await vaults.get_current_cdp_with_principal(Principal.fromText(window.ic.plug.principalId));
-      console.log(res);
-      if(res.ok) {
-        data.Max_Issuable_IRSC = Number(res.ok.max_debt) / 100000000;
-        data.Issued_IRSC = Number(res.ok.debt_issued) / 100000000;
-        data.Volume = Number(res.ok.volume) / 100000000;
-        data.Amount = Number(res.ok.amount) / 100000000;
-        data.Entry_Rate = Math.trunc(Number(res.ok.entry_rate) / 100000000);
-        data.Liquidation_Rate = Math.trunc(Number(res.ok.liquidation_rate) / 100000000);
-        data.Safemint_Rate = String(Number(res.ok.debt_rate)) + "%";
-        setLoaded(true);
-      } else {
-        alert("You don't have any active positions!");
-        window.location.href = "/create";
-      }
-    })();
-  }, []);
-
   return (
     <div className="flex flex-col items-center bg-gradient-to-r from-background to-purple p-6 rounded-lg shadow-lg h-screen">
+      { init ? 
       <h2 className="text-3xl font-bold text-silver font-primary my-6 border-b-2">CDP Interaction</h2>
+      :
+      <button className="px-4 py-2 rounded-lg bg-secondary text-silver" onClick={handleFetch}>{ loaded ? "Fetch" : "Loading.." }</button>
+      }
+      { init ? 
       <div className="w-full flex justify-center md:divide-x md:divide-silver h-full">
         <div className="md:w-1/2 p-3 flex flex-col items-center">
           <h3 className="text-2xl font-semibold mb-8 border-b-2 text-center text-blue-500 text-silver font-primary w-full">Details</h3>
@@ -162,6 +259,7 @@ const Interaction = () => {
           </div>
         </div>
       </div>
+      : "" }
     </div>
   );
 };

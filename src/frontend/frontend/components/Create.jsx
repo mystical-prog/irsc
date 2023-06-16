@@ -21,7 +21,7 @@ function Create() {
   };
 
   const handleSubmit = async () => {
-    if(sliderInput > 136 && sliderInput < 161 && numberInput >= 0.0001){
+    if(sliderInput > 136 && sliderInput < 161 && numberInput >= 0.001){
       const res = await vaults.create_cdp(Number(sliderInput - 135), Number(numberInput * 10**8));
       
       //
@@ -100,13 +100,6 @@ function Create() {
             onClick={handleSubmit}
           >
             Create
-          </button>
-          <button 
-            className="font-primary m-l-4 bg-secondary hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-full shadow-lg transform transition-shadow duration-500 ease-in-out hover:shadow-2xl focus:outline-none" 
-            type="submit"
-            onClick={handleSubAccount}
-          >
-            SubAccount
           </button>
         </div>
       </div>

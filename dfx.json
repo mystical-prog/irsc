@@ -46,7 +46,9 @@
       "wasm" : "icrc1.wasm"
     },
     "assets": {
-      "dependencies": [],
+      "dependencies": [
+        "vaults"
+      ],
       "frontend": {
         "entrypoint": "src/frontend/dist/index.html"
       },
