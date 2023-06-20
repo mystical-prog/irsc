@@ -14,6 +14,15 @@ To learn more about the project check the following links out -
 - [Best use of HTTPS outcalls](https://github.com/mystical-prog/irsc/blob/8624ba768dbfecb5297616fe98a687b2675d60b3/src/oracle/main.mo#L14)
 
 
+### Mainnet Deployed Canister Links - 
+
+- [Creation Frontend](https://idqav-oaaaa-aaaao-avbpq-cai.icp0.io/create/)
+- [Interaction Frontend](https://idqav-oaaaa-aaaao-avbpq-cai.icp0.io/interact/)
+- [Vaults](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=lge36-tiaaa-aaaao-avbea-cai)
+- [Marketplace](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=kfisy-hqaaa-aaaao-avbcq-cai)
+- [Oracle](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=klk7q-4aaaa-aaaao-avbdq-cai)
+- [IRSC Ledger](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=kcjum-kiaaa-aaaao-avbca-cai)
+
 ### For testing out the project
 
 ```bash
