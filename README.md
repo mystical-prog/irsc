@@ -23,6 +23,8 @@ To learn more about the project check the following links out -
 - [Oracle](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=klk7q-4aaaa-aaaao-avbdq-cai)
 - [IRSC Ledger](https://a4gq6-oaaaa-aaaab-qaa4q-cai.raw.icp0.io/?id=kcjum-kiaaa-aaaao-avbca-cai)
 
+```The frontend of the dApp on mainnet was not tested because of time crunch, but can be taken care of later, it works fine on the local development, as demonstrated in the demo.```
+
 ### For testing out the project
 
 ```bash
